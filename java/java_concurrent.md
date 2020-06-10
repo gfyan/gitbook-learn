@@ -149,7 +149,8 @@ final修饰的字段变量需要遵循两个重排序规则。 1. 在构造函�
 
 fina内存语义具体实现。
 
-写： 1. JMM禁止编译器把final域的写重排序到构造函数之外。 2. 编译器会在写final域之后，构造函数return之前，插入一个StoreStore屏障，这个屏障就是为了防止写final域操作被重排序到构造函数之外。
+写： 1. JMM禁止编译器把final域的写重排序到构造函数之外。 2. 编译器会在写final域之后，构造函数return之前，插入一个StoreSto
+re屏障，这个屏障就是为了防止写final域操作被重排序到构造函数之外。
 
 读： 1. 编译器会在读final域前面加一个LoadLoad屏障，防止了读对象引用和读final域不会被重排序。
 
@@ -193,6 +194,13 @@ fina内存语义具体实现。
 java并发包下的List只有一个CopyOnWriteArrayList，所以一般的情况会使用CopyOnWriteArrayList，也可以用Collections.synchronizedList\(\)来包装一个list从而达到线程安全，CopyOnWriteArrayList具体实现原理底层是基于独占锁ReentrantLock以及volatile修饰的数据实现的，每当有add、edit、remove操作的时候CopyOnWriteArrayList都会将原来的数组复制一份出来，对复制的数组进行修改，修改完成之后用新的数组替换原数组，进行add、edit、remove操作之前都会去获取独占锁，操作完成后释放独占锁，因为数组的引用是volatile的所以其他线程能够及时看到更新后的新数组。之所以采用这种方式是保证了读的并发数，保证写线程在操作的时候阻塞读线程。
 
 注意点：CopyOnWriteArrayList是一个弱一致性的数组，如果有写线程在操作数组的时候，读线程读的还是老数据，所以存在数据有一定的延迟性。
+
+## java并发包下的Set有用哪些？具体实现原理了解吗？
+
+java并发包下的Set我了解到的有CopyOnWriteArraySet、ConcurrentSkipListSet。<br>
+CopyOnWriteArraySet底层包装的是CopyOnWriteArrayList，它是基于CopyOnWriteArraySet实现的，没有做什么额外的逻辑。<br>
+ConcurrentSkipListSet底层包装的是ConcurrentSkipListMap，ConcurrentSkipListMap底层则是基于跳表实现的。
+
 
 ## AQS了解吗，具体什么原理，java并发下都有哪些工具使用了AQS？
 
