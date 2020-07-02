@@ -24,6 +24,20 @@ redis可以用于一下场景：
 - 缺点1：内存敏感，依赖于机器的内存，稍有处理不当可能导致服务不可用。（ps：可通过cluster、Codis实现多master分区，达到高可用）。
 - 缺点2：持久化机制在某些情况下可能导致备份过度占用cpu导致业务受到影响，且主从备份占用宽带也会有隐患存在。
 
+
+### 怎么解决redis缓存雪崩、缓存穿透、缓存击穿？
+先说下缓存雪崩和缓存击穿的场景吧，我们经常会把首页热点数据存在redis缓存中，缓存都会设置过期时间，因为要保证内存的良性使用，那么这个时候就存在缓存刷新问题，缓存过期了怎么重新加载缓存，1 缓存查不到了去数据库查询然后重新设置到缓存中，2. 定时刷新缓存保证缓存在某个时间段不会过期。
+
+缓存雪崩：缓存雪崩就是大批量的缓存数据同时失效，从而导致某一时刻所有的并发量直接打到db上导致db挂掉。
+> 导致缓存雪崩的原因是因为大批量热点数据同时失效导致的，那么我们在设置缓存过期时间加上一个随机值即可，防止同一时刻有太多key过期。 或者设置永远不过期也可以解决问题但是这样对内存来说不是很友好。
+
+缓存穿透：某些高并发接口一直访问不存在的数据，从而导致缓存中未查到数据直接打入db上导致db挂掉。
+> 导致缓存穿透是因为接口疯狂请求不存在的数据导致的，解决这个问题方案有两种，1.接口本身要对参数进行过滤，例如查询用户数据如果过来的是负值本身就不合理所以数据一定不会存在，2.对不存在的数据访问进行限流，限流的方式有很多ip和请求地址等，比如请求了一个不存在的数据直接设置一个key-value都为null并设置过期时间为10s，key为请求端的唯一标识符，时间可结合场景具体应用。 3.使用布隆过滤器（bloom filter）来对不存在的数据进行校验，如果校验出不存在则直接响应。
+
+缓存击穿：指的是某一个热点key平时抗住非常多的请求量，但是在某一时刻key失效了导致全部请求打到db上。
+> 因为击穿是针对某一个特定的热点key引发的，所以这一类非常热的缓存建议直接设置为不过期，如果真要设置过期时间，那么也建议在接口上做互斥处理，如果某一次请求过来发现缓存不存在这个时候直接分布式锁进行锁定，然后从数据库取的数据后再释放锁。
+
+
 ### Redis和Memcached有什么区别？
 1. redis支持复杂的数据结构，memcached只支持简单的字符串。
 2. redis支持原生的集群模式，memcached不支持。
@@ -68,7 +82,7 @@ embstr和raw形式：redis字符串超过44bytes会按照raw形式储存，44byt
 ### 怎么在线上坏境中找出符合特定规则的key列表？（ps：key在一千万左右）
 数据量非常大的情况下使用scan去循环查找，数据量小可以选择keys 简单粗暴，数据量大的情况下不建议使用keys，数据量多的情况下会导致整个服务卡顿，从而导致应用服务出错。
 
-scan的原理：因为redis中所有的key都是存放在一个大型字典中的，所以只要对一维数组进行挨个遍历就可以扫描所有的key，并且scan采用的是高位进位进行扫描的，可能会重现重复元素。采用高位进位扫描主要是避免遗漏。
+scan的原理：因为redis中所有的key都是存放在一个大型字典中的，所以只要对一维数组进行挨个遍历就可以扫描所有的key，并且scan采用的是高位进位进行扫描的，可能会出现重复元素,也可能会遗漏元素这个是不确定的。
 
 ### redis的线程模型了解吗？具体说说。
 redis的线程模型是单线程IO多路复用，为什么说redis是单线程IO多路复用呢，因为redis是基于Reactor模式开发了网络事件处理器，这个事件处理器被称为文件事件处理器，它的组成包含四个部分：套接字、IO多路复用程序、文件事件分派器、事件处理器，文件事件处理器是以单线程方式运行的，虽然是单线程但是利用了I/O多路复用来监听套接字，所以文件事件处理器也能展现相当高的性能。
@@ -109,3 +123,145 @@ AOF持久化策略则是使用增量原理，AOF备份的是redis指令序列，
 
 既然RDB和AOF都各自有优缺点，那么能不能出一套完整的持久化呢，那就是RDB、AOF混合模式，因为AOF进行重写的时候本身就会扫描内存所有的数据然后转换为指令存在AOF日志文件中，那么AOF重写的时候直接采用RDB模式进行持久化即可，然后AOF增量日志在后面进行追加即可，后续进行数据恢复的时候只需要分段加载即可，前半段采用RDB进行数据恢复，后半段进行AOF进行数据恢复。
 
+
+### redis主从同步机制
+
+redis主从同步复制分为三种，1.快照同步 2.增量同步 3.无盘同步，redis主从同步方式是异步的，也就是满足最终一致性，并不是每次主节点的数据修改都会引起同步，这里主要是为了保证可用性，但是一致性上并非强保证。
+
+1. 快照同步
+
+快照同步主要是发生在初次复制上，首次同步从节点会发送一个slaveof命令，主节点接受到命令后会执行bgsave操作生成一个rdb文件，然后使用一个缓冲区记录从现在开始执行所有的写命令，当主节点完成rdb的生成以及发送后会将缓冲区的写命令发送给从节点。
+
+2. 增量同步
+
+增量同步同步的是指令流，主节点会将修改redis数据的指令存放在一个buffer中，然后异步的将这些指令同步给从节点，从节点接收到命令执行相应的命令并反馈主节点当前的偏移量。如果因为网络断开时间非常长，buffer数组内容满了然后后续修改指令覆盖了之前的指令，这个时候增量同步就不适用了，必须使用快照同步来达到主从一致性。
+
+3. 无盘同步
+
+无盘复制是redis2.8.18版本以后才支持的，所为的无盘是针对快照复制的，前面我们说过快照复制是主节点先要生成RDB文件，然后再将RDB文件内容传给从节点，如果RDB数据文件很大的话这个操作将会很耗IO操作，无盘复制就避免了这个问题，无盘复制是一遍遍历内存数据一遍将数据序列化传送给从节点，从节点接受到之后才存入磁盘中最后一次性装载至内存中。
+
+
+**注意点：redis主从复制分为两个阶段，完整同步（快照同步）和部分同步（增量同步），从节点在初次复制的时候会先进行完整复制，完整复制之后进行部分同步，但是如果部分同步的过程中从节点断开太久，再次连入（部分同步的偏移量相差太大已经超过复制积压缓冲区）的时候也会进行完整同步的，或者主节点被更换也会进行完整同步。**
+
+### redis集群方式有哪些？
+
+### redis有哪些重要的指标，和业务场景结合。
+- 连接数
+
+所有指标中最重要的当然是检查redis是否还活着，可以通过命令PING的响应是否是PONG来判断。
+- 阻塞客户端数量
+
+连接的客户端数量，可通过命令src/redis-cli info Clients | grep connected_clients得到，这个值跟使用redis的服务的连接池配置关系比较大，所以在监控这个字段的值时需要注意。另外这个值也不能太大，建议不要超过5000，如果太大可能是redis处理太慢，那么需要排除问题找出原因。
+
+另外还有一个拒绝连接数（rejected_connections）也需要关注，这个值理想状态是0。如果大于0，说明创建的连接数超过了maxclients，需要排查原因。是redis连接池配置不合理还是连接这个redis实例的服务过多等。
+- 使用内存峰值
+
+监控redis使用内存的峰值，我们都知道Redis可以通过命令config set maxmemory 10737418240设置允许使用的最大内存（强烈建议不要超过20G），为了防止发生swap导致Redis性能骤降，甚至由于使用内存超标导致被系统kill，建议used_memory_peak的值与maxmemory的值有个安全区间，例如1G，那么used_memory_peak的值不能超过9663676416（9G）。另外，我们还可以监控maxmemory不能少于多少G，比如5G。因为我们以前生产环境出过这样的问题，运维不小心把10G配置成了1G，从而导致服务器有足够内存却不能使用的悲剧。
+- 内存碎片率
+
+mem_fragmentation_ratio=used_memory_rss/used_memory，这也是一个非常需要关心的指标。如果是redis4.0之前的版本，这个问题除了重启也没什么很好的优化办法。而redis4.0有一个主要特性就是优化内存碎片率问题（Memory de-fragmentation）。在redis.conf配置文件中有介绍即ACTIVE DEFRAGMENTATION：碎片整理允许Redis压缩内存空间，从而回收内存。这个特性默认是关闭的，可以通过命令CONFIG SET activedefrag yes热启动这个特性。
+> 当这个值大于1时，表示分配的内存超过实际使用的内存，数值越大，碎片率越严重。
+
+> 当这个值小于1时，表示发生了swap，即可用内存不够。
+
+另外需要注意的是，当内存使用量（used_memory）很小的时候，这个值参考价值不大。所以，建议used_memory至少1G以上才考虑对内存碎片率进行监控。
+
+- 缓存命中率
+
+keyspace_misses/keyspace_hits这两个指标用来统计缓存的命令率，keyspace_misses指未命中次数，keyspace_hits表示命中次数。keyspace_hits/(keyspace_hits+keyspace_misses)就是缓存命中率。视情况而定，建议0.9以上，即缓存命中率要超过90%。如果缓存命中率过低，那么要排查对缓存的用法是否有问题！
+- OPS
+
+instantaneous_ops_per_sec这个指标表示缓存的OPS，如果业务比较平稳，那么这个值也不会波动很大，不过国内的业务比较特性，如果不是全球化的产品，夜间是基本上没有什么访问量的，所以这个字段的监控要结合自己的具体业务，不同时间段波动范围可能有所不同。
+- 持久化
+
+rdb_last_bgsave_status、aof_last_bgrewrite_status，即最近一次或者说最后一次RDB/AOF持久化是否有问题，这两个值都应该是"ok"。另外，由于redis持久化时会fork子进程，且fork是一个完全阻塞的过程，所以可以监控fork耗时即latest_fork_usec，单位是微妙，如果这个值比较大会影响业务，甚至出现timeout。
+```
+127.0.0.1:6379> INFO Persistence
+# Persistence
+loading:0
+rdb_changes_since_last_save:0
+rdb_bgsave_in_progress:0
+rdb_last_save_time:1592149356
+rdb_last_bgsave_status:ok
+rdb_last_bgsave_time_sec:0
+rdb_current_bgsave_time_sec:-1
+rdb_last_cow_size:0
+aof_enabled:0
+aof_rewrite_in_progress:0
+aof_rewrite_scheduled:0
+aof_last_rewrite_time_sec:-1
+aof_current_rewrite_time_sec:-1
+aof_last_bgrewrite_status:ok
+aof_last_write_status:ok
+aof_last_cow_size:0
+
+127.0.0.1:6379> INFO Stats
+# Stats
+total_connections_received:1
+total_commands_processed:31
+instantaneous_ops_per_sec:0
+total_net_input_bytes:1051
+total_net_output_bytes:14232
+instantaneous_input_kbps:0.00
+instantaneous_output_kbps:0.00
+rejected_connections:0
+sync_full:0
+sync_partial_ok:0
+sync_partial_err:0
+expired_keys:1
+evicted_keys:0
+keyspace_hits:4
+keyspace_misses:4
+pubsub_channels:0
+pubsub_patterns:0
+latest_fork_usec:420
+migrate_cached_sockets:0
+slave_expires_tracked_keys:0
+active_defrag_hits:0
+active_defrag_misses:0
+active_defrag_key_hits:0
+active_defrag_key_misses:0
+
+```
+- 失效KEY
+
+如果把Redis当缓存使用，那么建议所有的key都设置了expire属性，通过命令src/redis-cli info Keyspace得到每个db中key的数量和设置了expire属性的key的属性，一般来说expires需要等于keys，如果expires远小于keys那么需要考虑到对永久key的业务进行优化了。
+```
+127.0.0.1:6379> INFO keyspace
+# Keyspace
+db0:keys=2,expires=1,avg_ttl=2201435	
+```
+
+- 慢日志
+
+### 怎么优化redis内存？
+
+### redis都有哪些性能问题，具体怎么解决？
+1. Master写内存快照，save命令调度rdbSave函数，会阻塞主线程的工作，当快照比较大时对性能影响是非常大的，会间断性暂停服务，所以Master最好不要写内存快照。
+2. Master AOF持久化，如果不重写AOF文件，这个持久化方式对性能的影响是最小的，但是AOF文件会不断增大，AOF文件过大会影响Master重启的恢复速度。Master最好不要做任何持久化工作，包括内存快照和AOF日志文件，特别是不要启用内存快照做持久化,如果数据比较关键，某个Slave开启AOF备份数据，策略为每秒同步一次。
+3. Master调用BGREWRITEAOF重写AOF文件，AOF在重写的时候会占大量的CPU和内存资源，导致服务load过高，出现短暂服务暂停现象。
+4. Redis主从复制的性能问题，为了主从复制的速度和连接的稳定性，Slave和Master最好在同一个局域网内。
+
+### Redis有几种数据“过期”策略？
+
+- 被动删除：当读/写一个已经过期的 key 时，会触发惰性删除策略，直接删除掉这个过期 key 。
+
+- 主动删除：由于惰性删除策略无法保证冷数据被及时删掉，所以 Redis 会定期主动淘汰一批已过期的 key 。
+
+- 主动删除：当前已用内存超过 maxmemory 限定时，触发主动清理策略。
+
+### Redis有哪几种数据“淘汰”策略？
+
+- noeviction(默认策略)：对于写请求不再提供服务，直接返回错误（DEL请求和部分特殊请求除外）
+- allkeys-lru：从所有key中使用LRU算法进行淘汰
+- volatile-lru：从设置了过期时间的key中使用LRU算法进行淘汰
+- allkeys-random：从所有key中随机淘汰数据
+- volatile-random：从设置了过期时间的key中随机淘汰
+- volatile-ttl：在设置了过期时间的key中，根据key的过期时间进行淘汰，越早过期的越优先被淘汰
+
+> 在 Redis 4.0 后，基于 LFU（Least Frequently Used）最近最少使用算法，增加了 2 种淘汰策略：
+volatile-lfu和allkeys-lfu。
+
+### RedisLRU算法
+另外，Redis 的 LRU 算法，并不是一个严格的 LRU 实现。这意味着 Redis 不能选择最佳候选键来回收，也就是最久未被访问的那些键。相反，Redis 会尝试执行一个近似的 LRU 算法，通过采样一小部分键，然后在采样键中回收最适合(拥有最久未被访问时间)的那个。
+**Redis 没有使用真正实现严格的 LRU 算是的原因是，因为消耗更多的内存。然而对于使用 Redis 的应用来说，使用近似的 LRU 算法，事实上是等价的。**
