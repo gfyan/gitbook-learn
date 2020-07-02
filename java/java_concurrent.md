@@ -19,9 +19,9 @@ java中存在两种线程，一种是守护线程，一种是用户线程。
 ## 创建线程有哪些方式？
 
 java创建线程有三种方式：  
- 1.继承Thread类创建线程类。  
- 2.实现Runnable接口创建线程类。  
- 3.通过Callable和Future创建线程。
+1.继承Thread类创建线程类。  
+2.实现Runnable接口创建线程类。  
+3.通过Callable和Future创建线程。
 
 ## 线程存在哪些状态，每个状态都有什么特征？
 
@@ -78,9 +78,8 @@ synchronized是java的同步关键字，底层是采用monitorenter和monitorexi
 在java中任何对象都有一个对象头，这个对象头主要用于存储对象的gc信息、锁信息、对象的hashcode、指向对象实例数据的指针以及数组长度，数组长度只针对于数组才会有的属性。综述对象头主要有三大块，Mark word、指向实例数据的指针、数组长度。
 
 Mark word主要存储对象的hashcode、分代年龄和锁标记位，但是存储数据也不是一沉不变，运行期间会根据锁标志位变化而变化。 轻量级锁：指向栈锁记录的指针+锁标志位  
- 重量级锁：指向互斥量（重量级锁）的指针+锁标志位  
- 偏向锁：锁拥有线程id+epoch+对象分代年龄+锁标志位  
-
+重量级锁：指向互斥量（重量级锁）的指针+锁标志位  
+偏向锁：锁拥有线程id+epoch+对象分代年龄+锁标志位
 
 指向对象实例的指针：32位虚拟机下是占用32bit，但是在64位虚拟机下占用是64bit，但是虚拟机开启了指针压缩的话会采用32bit。
 
@@ -99,9 +98,8 @@ volatile是java的一个关键字，可以用来修饰变量，如果一个变�
 JMM是java内存模型，它是虚拟机的一种规范，它屏蔽了各种硬件和操作系统的差异，规范了JVM如何解决java程序在各个平台下运行的变量可见性问题、原子性问题、有序性问题。
 
 可见性问题：如何保证一个线程对共享变量的操作何时对其他线程可见。  
- 原子性问题：如何保证多个操作在cpu执行过程中不被中断。  
- 有序性问题：如何保证源代码编译不被重排序、指令级并行重排序、内存系统重排序。  
-
+原子性问题：如何保证多个操作在cpu执行过程中不被中断。  
+有序性问题：如何保证源代码编译不被重排序、指令级并行重排序、内存系统重排序。
 
 线程之间的通信方式有两种，共享内存、消息传递，java采用的是共享内存模型。
 
@@ -121,15 +119,14 @@ JMM是java内存模型，它是虚拟机的一种规范，它屏蔽了各种硬�
 **happens-before规则**：
 
 happens-before规则是对先行关系的描述，该规则表述的是如果一个操作A执行的结果需要对另外一个操作B可见，那么这两个操作必须存在happens-before关系，且A 一定是happens-before 于B，happens-before具体定义包括如下：  
- 1）程序顺序规则：一个线程中的每个操作happens-before与后续的任意操作。  
- 2）监视器锁规则：对一个锁的解锁happens-before于对这个锁的加锁。  
- 3）volatile规则：对一个volatile的写happens-before于任意后续对这个volatile域的读。  
- 4）传递性：如果A happens-before B B happens-before C 那么A也一定 happens-before C。  
- 5）start（）规则：线程start（）方法 happens-before 于此线程的每一个操作。  
- 6）join（）规则：线程中所有的操作都 happens-before 于线程的join方法（）。  
- 7）对象终结规则：一个对象的初始化完成（构造函数执行结束）happens-before 于该对象finalize方法。  
- 8）线程中断规则：对线程的中断方法（interrupt）的调用 happens-before 检测到中断事件的发生。  
-
+1）程序顺序规则：一个线程中的每个操作happens-before与后续的任意操作。  
+2）监视器锁规则：对一个锁的解锁happens-before于对这个锁的加锁。  
+3）volatile规则：对一个volatile的写happens-before于任意后续对这个volatile域的读。  
+4）传递性：如果A happens-before B B happens-before C 那么A也一定 happens-before C。  
+5）start（）规则：线程start（）方法 happens-before 于此线程的每一个操作。  
+6）join（）规则：线程中所有的操作都 happens-before 于线程的join方法（）。  
+7）对象终结规则：一个对象的初始化完成（构造函数执行结束）happens-before 于该对象finalize方法。  
+8）线程中断规则：对线程的中断方法（interrupt）的调用 happens-before 检测到中断事件的发生。
 
 **volatile内存语义**：
 
@@ -149,8 +146,7 @@ final修饰的字段变量需要遵循两个重排序规则。 1. 在构造函�
 
 fina内存语义具体实现。
 
-写： 1. JMM禁止编译器把final域的写重排序到构造函数之外。 2. 编译器会在写final域之后，构造函数return之前，插入一个StoreSto
-re屏障，这个屏障就是为了防止写final域操作被重排序到构造函数之外。
+写： 1. JMM禁止编译器把final域的写重排序到构造函数之外。 2. 编译器会在写final域之后，构造函数return之前，插入一个StoreSto re屏障，这个屏障就是为了防止写final域操作被重排序到构造函数之外。
 
 读： 1. 编译器会在读final域前面加一个LoadLoad屏障，防止了读对象引用和读final域不会被重排序。
 
@@ -187,7 +183,7 @@ re屏障，这个屏障就是为了防止写final域操作被重排序到构造�
 当cpu访问某个变量的时候会对变量进行读取，先看缓存中是否存在，如果有则直接读取，没有的话则去主内存中读取该变量，并且把该变量所在的区域的一个Cache大小的内存数据读取到缓存中。假设这个时候有两个线程对这个Cache中的不同变量进行修改，如果线程A修改了Cache中的变量A，那么就会导致线程B中的缓存被置为失效，线程B再次操作的时候则需要去二级缓存或者主内存中去重新获取数据，且线程A在对共享缓存行进行操作的时候，线程B只能等待，这会导致性能急剧下降，这就是伪共享问题。
 
 **怎么解决伪共享问题？**  
- 其实伪共享最终原因是因为共享缓存行导致的，所以我们只需要将计算频率非常高的变量独享一个缓存行就行，在java8中有一个Contended注解，这个注解就可以解决这个问题，Contended注解是在变量前后加一个128字节宽度的空白填充，从而使得变量独占一个缓存行。
+其实伪共享最终原因是因为共享缓存行导致的，所以我们只需要将计算频率非常高的变量独享一个缓存行就行，在java8中有一个Contended注解，这个注解就可以解决这个问题，Contended注解是在变量前后加一个128字节宽度的空白填充，从而使得变量独占一个缓存行。
 
 ## java并发包中的List有用过哪些吗？具体实现原理了解吗？
 
@@ -197,10 +193,9 @@ java并发包下的List只有一个CopyOnWriteArrayList，所以一般的情况�
 
 ## java并发包下的Set有用哪些？具体实现原理了解吗？
 
-java并发包下的Set我了解到的有CopyOnWriteArraySet、ConcurrentSkipListSet。<br>
-CopyOnWriteArraySet底层包装的是CopyOnWriteArrayList，它是基于CopyOnWriteArraySet实现的，没有做什么额外的逻辑。<br>
-ConcurrentSkipListSet底层包装的是ConcurrentSkipListMap，ConcurrentSkipListMap底层则是基于跳表实现的。
-
+java并发包下的Set我了解到的有CopyOnWriteArraySet、ConcurrentSkipListSet。  
+ CopyOnWriteArraySet底层包装的是CopyOnWriteArrayList，它是基于CopyOnWriteArraySet实现的，没有做什么额外的逻辑。  
+ ConcurrentSkipListSet底层包装的是ConcurrentSkipListMap，ConcurrentSkipListMap底层则是基于跳表实现的。
 
 ## AQS了解吗，具体什么原理，java并发下都有哪些工具使用了AQS？
 

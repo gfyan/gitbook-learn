@@ -8,7 +8,7 @@
 * [网络部分](internet_basic.md)
 * [中间件部分](middleware/README.md)
   * [redis部分](middleware/redis.md)
-  * [rocketMQ部分](middleware/rocket_ma.md)
+  * [rocketMQ部分](middleware/rocketmq-bu-fen.md)
 * [数据库部分](database.md)
 * [项目实战部分](project.md)
 
