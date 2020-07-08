@@ -59,4 +59,8 @@ Producer端在发送消息的时候，会先根据Topic找到指定的TopicPubli
 
 (3) 先对Topic下的消息消费队列、消费者Id排序，然后用消息队列分配策略算法（默认为：消息队列的平均分配算法），计算出待拉取的消息队列。这里的平均分配算法，类似于分页的算法，将所有MessageQueue排好序类似于记录，将所有消费端Consumer排好序类似页数，并求出每一页需要包含的平均size和每个页面记录的范围range，最后遍历整个range而计算出当前Consumer端应该分配到的记录（这里即为：MessageQueue）。
 
+### rocketMQ如何实现延时消息？
+
+延时消息，rocketMQ不支持任何时间的延时，只支持特定的延时级别，目前有16个延时级别分别为1s 5s 10s 30s 1m 2m 3m 4m 5m 6m 7m 8m 9m 10m 20m 30m 1h 2h，rocketMQ内部设置了一个延时topic，名称为SCHEDULE_TOPIC_XXXX，所有延时消息发送到broker，broker都会对其消息进行topic替换操作，换成SCHEDULE_TOPIC_XXXX，broker本身启动的时候会启动对应的延时消息调度器ScheduleMessageService，每个级别对应一个ScheduleMessageService，所以broker内部启动了16个ScheduleMessageService，每隔特定时间根据offset从消息消费队列中获取当前队列中所有有效的消息。如果未找到，则更新一下延迟队列定时拉取进度并创建定时任务待下一次继续尝试。如果找到可用的消息则对齐进行置换，转换为真实的topic再次写入commitLog中，以便于正常业务逻辑消费。
+
 
