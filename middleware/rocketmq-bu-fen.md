@@ -59,8 +59,85 @@ Producer端在发送消息的时候，会先根据Topic找到指定的TopicPubli
 
 (3) 先对Topic下的消息消费队列、消费者Id排序，然后用消息队列分配策略算法（默认为：消息队列的平均分配算法），计算出待拉取的消息队列。这里的平均分配算法，类似于分页的算法，将所有MessageQueue排好序类似于记录，将所有消费端Consumer排好序类似页数，并求出每一页需要包含的平均size和每个页面记录的范围range，最后遍历整个range而计算出当前Consumer端应该分配到的记录（这里即为：MessageQueue）。
 
-### rocketMQ如何实现延时消息？
+### rocketMQ 如何实现延时消息？
 
-延时消息，rocketMQ不支持任何时间的延时，只支持特定的延时级别，目前有16个延时级别分别为1s 5s 10s 30s 1m 2m 3m 4m 5m 6m 7m 8m 9m 10m 20m 30m 1h 2h，rocketMQ内部设置了一个延时topic，名称为SCHEDULE_TOPIC_XXXX，所有延时消息发送到broker，broker都会对其消息进行topic替换操作，换成SCHEDULE_TOPIC_XXXX，broker本身启动的时候会启动对应的延时消息调度器ScheduleMessageService，每个级别对应一个ScheduleMessageService，所以broker内部启动了16个ScheduleMessageService，每隔特定时间根据offset从消息消费队列中获取当前队列中所有有效的消息。如果未找到，则更新一下延迟队列定时拉取进度并创建定时任务待下一次继续尝试。如果找到可用的消息则对齐进行置换，转换为真实的topic再次写入commitLog中，以便于正常业务逻辑消费。
+延时消息，rocketMQ不支持任何时间的延时，只支持特定的延时级别，目前有16个延时级别分别为1s 5s 10s 30s 1m 2m 3m 4m 5m 6m 7m 8m 9m 10m 20m 30m 1h 2h，rocketMQ内部设置了一个延时topic，名称为SCHEDULE_TOPIC_XXXX，所有延时消息发送到broker，broker都会对其消息进行topic替换操作，换成SCHEDULE_TOPIC_XXXX，broker本身启动的时候会启动对应的延时消息调度器ScheduleMessageService，每个级别对应一个ScheduleMessageService，所以broker内部启动了16个ScheduleMessageService，每隔特定时间根据offset从消息消费队列中获取当前队列中所有有效的消息。如果未找到，则更新一下延迟队列定时拉取进度并创建定时任务待下一次继续尝试。如果找到可用的消息则对其进行置换，转换为真实的topic再次写入commitLog中，以便于正常业务逻辑消费。
+
+### rocketMQ 如何实现消息消费失败重试？
+
+1. Consumer 消费失败，将消息发送回 Broker 。
+
+Consumer 消息失败后，会将消息的 Topic 修改为 %RETRY% + Topic 进行，添加 "RETRY_TOPIC" 属性为原始 Topic ，然后再返回给 Broker 中。
+
+2. Broker 收到重试消息之后置换 Topic ，存储消息。
+
+Broker 收到重试消息之后，会有两次修改消息的 Topic 。首先，会将消息的 Topic 修改为 %RETRY% + ConsumerGroup ，因为这个消息是当前消费这分组消费失败，只能被这个消费组所重新消费。消费者会默认订阅 Topic 为 %RETRY% + ConsumerGroup 的消息。然后，会将消息的 Topic 修改为 SCHEDULE_TOPIC_XXXX ，添加 "REAL_TOPIC" 属性为 %RETRY% + ConsumerGroup ，因为重试消息需要延迟消费。
+
+3. Consumer 会拉取该 Topic 对应的 retryTopic 的消息。
+
+Consumer 会拉取该 Topic 对应的 retryTopic 的消息，此处的 retryTopic 为 %RETRY% + ConsumerGroup 。
+
+4. Consumer 拉取到 retryTopic 消息之后，置换到原始的 Topic ，把消息交给 Listener 消费。
+
+Consumer 拉取到 retryTopic 消息之后，置换到原始的 Topic ，因为有消息的 "RETRY_TOPIC" 属性是原始 Topic ，然后把消息交给 
+Listener 消费。
+
+> 注意消息消费失败最多16次，这主要是rocketMQ延迟级别只有16个，16次消息消费失败后会储存到TOPIC名为"%DLQ%" + ConsumerGroup，可以写一个对应的订阅关系进行异常消息警报。
+
+### rocketMQ 如何实现事物消息？
+
+rocketMQ的事物消息也是基于Topic替换的思想。
+
+1.首先Producer发送事物消息至broker，broker会将消息储存到名为Half的topic中，随后会开启一个定时任务进行查询，防止Producer挂掉事物无法确定，需要注意查询最多查询15次，超过15次该消息默认回滚掉。
+
+2.Producer进行事物提交或者回滚的时候，broker会添加一条消息至OP_Half的topic中，储存的是Half消息对应的offset表示这个事物消息已经提交或者回滚。
+
+3.Producer提交消息的时候，broker会将消息储存至原Topic当中，从而使得对应的consumer进行拉取消费。
+
+### Producer 发送消息有几种方式？
+
+1. 同步方式
+
+同步发送消息，等待broker存储消息结果，成功或者失败当场直接返回。
+
+2. 异步方式
+
+异步发送消息，发送消息的时候会带着回调钩子函数，broker存储消息完毕之后触发回调钩子函数，发送方处理后续业务逻辑。
+
+3. Oneway方式
+
+只管发，不管结果。
 
 
+### consumer 消费消息过程？
+
+rocketMQ消息消费都是采用的拉模式，没有推模式，虽然推模式的配置方式，但是rocketMQ底层也是采用的拉模式去做，正常拉模式消费流程不用说，就是客户端自己写业务逻辑定时去消息储存中心broker拉取消息，那么包装过一层的推模式到底怎么实现的呢？
+
+首先rocketMQ每个消费者端启动的时候都会带有重启一个PullMessageService服务，该服务会循环从pullRequestQueue队列当中去获取pullRequest对象，pullRequestQueue是一个并发阻塞队列，获取PullRequest对象中的消息处理队列，如果消息处理队列消息堆积过多进行消息流控业务处理，然后获取对应的主题信息以及broker信息，最后把拉取请求发送给服务端，服务端收到请求后会默认阻塞15s的时间，这个阻塞时间是在消息获取不到的时候，如果获取到消息立马进行返回，这样也起到了一个控制作用，如果topic下的队列不存在可消费消息的时候避免过多的无用请求，服务端返回拉取结果后对结果进行解码执行PullCallback回调逻辑，执行消息过滤逻辑后将拉取的消息提交给消费者线程池进行消费。
+
+pullRequestQueue：是一个阻塞队列，消费端自产自销。
+
+PullRequest：这个PullRequest是一个非常重要的对象，他内部封装了消费组、待拉取消息的消费队列、消息处理队列（从broker拉取的消息先入这个队）、待拉取消息的偏移量、锁标志。这个pullRequest对象生成方式有两种，1.消费端的负载均衡每20s会重新进行消费队列负载，每次重新负载之后会生成PullRequest放入pullRequestQueue。2.每次拉取消息之后，只要不是异常都会再次投递进行下次消息拉取。如果拉取消息异常则会延迟一会儿进行下次拉取（默认1s）。
+
+### RocketMQ 如何实现高可用？
+
+1. **NameServer**
+
+NameServer需要部署多个节点，以保证NameServer的高可用，NameServer集群并互相通信，但是可以避免某一个NameServer出现问题的时候导致rocketMQ不可工作。
+
+2. **broker**
+
+多个Broker可以形成一个Broker分组。每个Broker分组存在一个Master和多个Slave节点，Master节点提供读和写功能，Slave 节点提供读功能，Master节点会不断发送新的CommitLog给Slave节点，Slave节点不断上报本地的CommitLog已经同步到的位置给Master 节点。当某个时刻Master出现问题的时候Salve也可以顶上达到高可用效果。
+
+### RocketMQ 是否会弄丢数据？如何避免。
+
+- 消费端：首先消费端不存在丢失消息，因为每个消息消费需要提交一个ack给broker，如果broker没有收到对应的ack表示该消息没有消费，会继续投递给消费组的其他消费者。只是消费端会存在一个重复消费的场景，所以消费端需要做好业务幂等性，防止重复消费对业务造成影响。
+
+- broker节点：什么情况下broker会存在消息丢失了，broker在接受到消息的时候会先存入commitLog中，这个写入不是直接写入磁盘是先写入pageCache中，然后再通过刷盘机制刷到磁盘中，默认配置是异步刷盘，如果是异步刷盘那就存在消息丢失的可能，可以改为同步刷盘以防止消息丢失，但是这样会带来性能的损耗。
+
+
+### RocketMQ 如何实现顺序消息？
+
+Producer：如果对消息有顺序要求，那么Producer发送消息的时候一定要单线程发送，如果是并发发送消息的话，消息本身进入commitLog就不是顺序，这个时候消费者即便是指定顺序消费也没有意义。
+
+Consumer：消费者，消费者可以实现局部顺序消费，如果需要全局顺序消费则需要配置Topic只有一个逻辑队列与之对应，如果使用阿里云的rocketMQ则只需要指定shardingKey即可，通过shardingKey可以路由到特定的队列下。Consumer局部顺序消费是通过锁来实现的，这个局部指的是消费者对应的逻辑队列部分。
