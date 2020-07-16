@@ -63,7 +63,7 @@ interrupt是用来中断一个线程的方法，interrupted用来判断某个线
 
 ## synchronized底层是如果实现的？
 
-synchronized是java的同步关键字，底层是采用monitorenter和monitorexit两个指令去实现的，任何对象都有一个monitor与之关联，当且一个monitor被持有后，它将处于锁定状态，monitorenter指令就是用来获取monitor所有权的操作，monitorexit则是对应释放monitor的所有权，monitor对象是同步的基本单元。 在早起java中，jdk1.6的monitor的实现完全是依靠系统内部的互斥锁，所以需要进行坏境切换，需要从用户态切换到内核态，所以早起的所以早起的synchronized是一个无差别的重量级操作，在后期的jdk中，synchronized被不断的优化，当先的synchronized提供了三种不同的monitor实现，这三种分别是偏向锁、轻量级锁、重量级锁，大大改进了synchronized的性能。
+synchronized是java的同步关键字，底层是采用monitorenter和monitorexit两个指令去实现的，任何对象都有一个monitor与之关联，当且一个monitor被持有后，它将处于锁定状态，monitorenter指令就是用来获取monitor所有权的操作，monitorexit则是对应释放monitor的所有权，monitor对象是同步的基本单元。 在早起java中，jdk1.6的monitor的实现完全是依靠系统内部的互斥锁，所以需要进行坏境切换，需要从用户态切换到内核态，所以早期的synchronized是一个重量级操作，在后期的jdk中，synchronized被不断的优化，当先的synchronized提供了三种不同的monitor实现，这三种分别是偏向锁、轻量级锁、重量级锁，大大改进了synchronized的性能。
 
 所谓的锁升级、降级，就是jvm针对不同的并发坏境去优化synchronized的机制，当jvm检测到不同的竟态坏境的时候，就会自动的切换适合的锁去实现。
 
@@ -71,7 +71,7 @@ synchronized是java的同步关键字，底层是采用monitorenter和monitorexi
 
 轻量级锁：如果有另外一个线程尝试获取一个已经被偏向过的锁对象，jvm就会撤销偏向锁，并切换到轻量级锁，表示当前线程出现了竟态，轻量级锁也是依赖cas的，cas尝试将对象锁的对象头中的线程id置为当前线程，如果cas成功，则直接使用轻量级锁，否则升级为重量级锁。
 
-重量级锁：早起的synchronized的实现。
+重量级锁：早期的synchronized的实现。
 
 ## java的对象头了解吗，主要由哪些部分组成。
 

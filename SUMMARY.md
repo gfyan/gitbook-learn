@@ -2,6 +2,7 @@
 
 * [介绍](README.md)
 * [java部分](java/README.md)
+  * [java数据结构](java/java-shu-ju-jie-gou.md)
   * [java基本知识点](java/java_basis.md)
   * [java并发知识点](java/java_concurrent.md)
   * [java虚拟机知识点](java/java_jvm.md)
