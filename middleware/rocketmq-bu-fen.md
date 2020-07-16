@@ -61,7 +61,7 @@ Producer端在发送消息的时候，会先根据Topic找到指定的TopicPubli
 
 ### rocketMQ 如何实现延时消息？
 
-延时消息，rocketMQ不支持任何时间的延时，只支持特定的延时级别，目前有16个延时级别分别为1s 5s 10s 30s 1m 2m 3m 4m 5m 6m 7m 8m 9m 10m 20m 30m 1h 2h，rocketMQ内部设置了一个延时topic，名称为SCHEDULE_TOPIC_XXXX，所有延时消息发送到broker，broker都会对其消息进行topic替换操作，换成SCHEDULE_TOPIC_XXXX，broker本身启动的时候会启动对应的延时消息调度器ScheduleMessageService，每个级别对应一个ScheduleMessageService，所以broker内部启动了16个ScheduleMessageService，每隔特定时间根据offset从消息消费队列中获取当前队列中所有有效的消息。如果未找到，则更新一下延迟队列定时拉取进度并创建定时任务待下一次继续尝试。如果找到可用的消息则对其进行置换，转换为真实的topic再次写入commitLog中，以便于正常业务逻辑消费。
+延时消息，rocketMQ不支持任何时间的延时，只支持特定的延时级别，目前有18个延时级别分别为1s 5s 10s 30s 1m 2m 3m 4m 5m 6m 7m 8m 9m 10m 20m 30m 1h 2h，rocketMQ内部设置了一个延时topic，名称为SCHEDULE_TOPIC_XXXX，所有延时消息发送到broker，broker都会对其消息进行topic替换操作，换成SCHEDULE_TOPIC_XXXX，broker本身启动的时候会启动对应的延时消息调度器ScheduleMessageService，每个级别对应一个ScheduleMessageService，所以broker内部启动了18个ScheduleMessageService，每隔特定时间根据offset从消息消费队列中获取当前队列中所有有效的消息。如果未找到，则更新一下延迟队列定时拉取进度并创建定时任务待下一次继续尝试。如果找到可用的消息则对其进行置换，转换为真实的topic再次写入commitLog中，以便于正常业务逻辑消费。
 
 ### rocketMQ 如何实现消息消费失败重试？
 
@@ -82,7 +82,7 @@ Consumer 会拉取该 Topic 对应的 retryTopic 的消息，此处的 retryTopi
 Consumer 拉取到 retryTopic 消息之后，置换到原始的 Topic ，因为有消息的 "RETRY_TOPIC" 属性是原始 Topic ，然后把消息交给 
 Listener 消费。
 
-> 注意消息消费失败最多16次，这主要是rocketMQ延迟级别只有16个，16次消息消费失败后会储存到TOPIC名为"%DLQ%" + ConsumerGroup，可以写一个对应的订阅关系进行异常消息警报。
+> 注意消息消费失败最多16次，消息重试从10s延迟级别开始，16次消息消费失败后会储存到TOPIC名为"%DLQ%" + ConsumerGroup，可以写一个对应的订阅关系进行异常消息警报。
 
 ### rocketMQ 如何实现事物消息？
 
@@ -141,3 +141,5 @@ NameServer需要部署多个节点，以保证NameServer的高可用，NameServe
 Producer：如果对消息有顺序要求，那么Producer发送消息的时候一定要单线程发送，如果是并发发送消息的话，消息本身进入commitLog就不是顺序，这个时候消费者即便是指定顺序消费也没有意义。
 
 Consumer：消费者，消费者可以实现局部顺序消费，如果需要全局顺序消费则需要配置Topic只有一个逻辑队列与之对应，如果使用阿里云的rocketMQ则只需要指定shardingKey即可，通过shardingKey可以路由到特定的队列下。Consumer局部顺序消费是通过锁来实现的，这个局部指的是消费者对应的逻辑队列部分。
+
+顺序消息与并发消息的区别：1.顺序消息在创建消息队列拉取任务时需要在Broker服务器锁定该消息队列。
