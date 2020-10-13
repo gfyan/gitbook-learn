@@ -234,7 +234,7 @@ update set b = 2 where b = 1;
 2.普通索引直接进行数据更新，并写入redo log数据页修改操作。<br>
 
 **该记录不在内存中**
-
+ 
 1.因为是唯一索引，所以需要判断是否存在冲突情况，这个时候就需要去数据表中读取相应的数据页到内存中，之后进行判断，如果没有冲突进行更新，并写入redo log相应的数据页修改操作。<br>
 2.普通索引直接将更新操作记录到change buffer中，并写入redo log数据页修改操作。<br>
 
@@ -244,5 +244,49 @@ update set b = 2 where b = 1;
 
 虽然change buffer能够带来普通索引上的更新性能优化，但是如果数据被更新之后立马需要进行查询的话，这个时候一样的会进行数据io访问，因为change buffer中只存了数据的更新操作，并没有相应的数据，所以这次查询需要从数据表中读取数据，并结合change buffer的修改得到正确数据后进行返回。
 
+
+### mysql如何保证数据不丢失？
+
+要了解到mysql如何保证数据不丢失，我们需要了解到两个日志，一个是binlog，一个是redo log。
+
+**binlog写入特性**
+
+binlog的写入顺序为，binlog cache -> page cache -> 磁盘binlog文件，这里的binlog cache每个线程都有一片内存专门用于binlog数据的存储，这个存储只是短暂的，写入很快，事务提交的时候会将binlog中的数据写入到page cache中，并且清空binlog cache中的数据，page cache写入到磁盘这一步比较慢，因为这一步涉及到了io，这一步也是受参数控制的。
+
+> sync_binlog=0的时候，表示每次都只write（写入page cache），不进行fsync（也就是写入磁盘）。
+> sync_binlog=1的时候，每次提交事务的时候都会fsync。
+> sync_binlog=N(N>0)的时候，表示每次提交事务都会write，但是fsync会累计N个事务后才会触发。
+
+**redo log写入特性**
+
+redo log写入顺序为，redo log buffer -> page cache -> 磁盘redo log，同样的写入规则也受参数控制，innodb_flush_log_at_trx_commit这个参数。
+
+>innodb_flush_log_at_trx_commit=0 每次事务提交的时候只是把redo log留在redo log buffer中。
+>innodb_flush_log_at_trx_commit=1 每次事务提交的时候都将redo log直接持久化到磁盘。
+>innodb_flush_log_at_trx_commit=2 每次事务提交时只是把redo log写入到page cache中。
+
+>innodb后台有一个线程，每隔一秒就会把redo log buffer中的日志写入到 page cache中，之后会直接持久化到磁盘中。
+>redo log buffer 占用的空间即将达到 innodb_log_buffer_size 一半的时候，后台线程会主动写盘。
+>并行的事务提交的时候，顺带将这个事务的 redo log buffer 持久化到磁盘。
+
+通过上述两个日志写入规则我们可以知道，mysql保证数据不丢失，必须先将sync_binlog、innodb_flush_log_at_trx_commit设置为1，每次事务提交都将日志强制写入磁盘中便可以保证数据不丢失，断电重启也能通过这两个日志进行数据修复。
+
+
+### mysql如何保证主从一致性？
+
+mysql的主从同步是基于binlog去实现的，主服务器会运行一个log dump thread，从服务器会运行两个线程（I/O thread SQL thread），当从服务器连接到主服务器的时候，主服务器会创建一个log dump线程，这个线程专门用来发送binlog内容，而从服务器在执行start salve命令后，从服务器会使用I/O线程连接主节点，用来接收binlog内容，接收到的binlog保存在本地的relay-log中，之后从服务器通过SQL thread读取binlog解析为具体的操作并执行。
+
+
+### 主从架构下的读写分离都有什么问题？
+
+1.读写分离在主从复制出现大量延迟的时候，会出现数据不一致性从而影响业务功能。
+
+> 解决方案：
+> 1.从库查询的时候每次可以先执行以下show slave status，查看seconds_behind_master是否为0，0表示主从同步延迟为0s，如果不为0的情况下强制走主库查询
+> 2.对比主从的GTID，GTID表示全局事务id，是递增的，通过这个判断主从是否有延迟，如果有延迟强制走主库查询。
+> 3.设置主从同步为同步方式，即每次事务提交都将事务同步给从库，同步成功则进行事务提交，同步失败事务进行回滚，但是这个方式会大大降低事务提交性能，从而降低tps。
+
+
+### 在线进行大表DDL有什么坑？
 
 
