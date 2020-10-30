@@ -287,6 +287,74 @@ mysql的主从同步是基于binlog去实现的，主服务器会运行一个log
 > 3.设置主从同步为同步方式，即每次事务提交都将事务同步给从库，同步成功则进行事务提交，同步失败事务进行回滚，但是这个方式会大大降低事务提交性能，从而降低tps。
 
 
-### 在线进行大表DDL有什么坑？
+### 如何对线上的表进行DDL
+
+mysql5.6以后虽然支持的Online DDL，但是在进行DDL的同时也需要加上超时时间（只有MariaDB、AliSQL有），mysql还是需要开发人员自己去判断当前是否存在大事务，如果有大事务（通过information_schema库的innodb_trx 表查看）需要过一段时间进行执行，防止线上的大事物阻塞DDL拿取MDL写锁，从而导致后续所有的业务都被阻塞，导致大量的线上业务失败。
+
+> 操作语句 alter table xxxx operations ALGORITHM=INPLACE; ALGORITHM有两个选项一个是COPY表示进行DDL的时候会采用拷贝表内容的形式进行，而INPLACE则是在原表上进行修改。
+
+**Online DDL流程**
+1. 拿取MDL写锁
+2. 降级为MDL读锁
+3. 真正做DDL操作
+4. 升级为MDL写锁
+5. 释放MdL写锁
+
+**Online DDL支持功能**
+
+功能   | inplace | 是否需要重建表 | 是否允许并发DML 
+----| ----
+创建或添加二级索引 | 支持 | 否 | 允许
+删除索引 | 支持 | 否 | 允许
+重命名索引 | 支持 | 否 | 允许
+添加全文索引 | 支持 | 否 | 不允许
+添加空间索引 | 支持 | 否 | 不允许
+更改索引类型 | 支持 | 否 | 允许 
+删除主键 | 不支持 | 是 | 不允许 
+添加主键 | 支持 | 是 | 允许 
+删除主键但是同时添加另一个主键 | 支持 | 是 | 允许 
+
+**列更改除了更改列的类型以外其他的都是支持inplace、支持并发DML**
+
+
+### MyISAM 和 InnoDB 的区别
+
+1. MyISAM不支持事务，InnoDB支持事务。
+2. 锁方面，MyISAM最小粒度锁只有表锁没有行锁，所以更新语句会锁住整个表，但是InnoDB有行锁，更新语句最小粒度是某一行的锁。
+3. InnoDB不存表的行数，所以统计一个表的行的时候InnoDB需要扫描符合条件的行，最后统计出来行数，但是MyISAM使用了一个变量保存行数，查询行数非常快。
+4. 外键，MyISAM不支持外键，InnoDB支持外键。
+5. 索引，InnoDB是聚集索引，主键索引和数据是存放在一起的，二级索引数据存放的是主键的值，需要多查一次（回表），但是MyISAM则是非聚集索引，它的索引和数据文件是分开的，每个索引存放的都是数据地址的指针。
+
+### mysql order by实现机制
+
+>例子 select column from table where xxx like '胡%' order by column limit 10;
+
+**全字段排序**
+
+排序的时候首先MySQL会给每个线程分配一块内存用于排序，称为sort_buffer，sort_buffer存储的是所查询的内容，通过where条件查询出过滤后的数据后依次放入sort_buffer中，如果sort_buffer储存不下mysql则会采用外部文件储存内容，使用多个文件进行归并排序，如果sort_buffer存放的下则直接在sort_buffer中进行排序，排序完毕之后取前10条进行数据返回。
+
+**rowId排序**
+
+rowId排序和全字段排序的流程差不多，只不过往sort_buffer中存放的数据是排序字段、主键id，如果查询的字段内容超过max_length_for_sort_data值的时候则会采用rowId排序，后面排序完毕后还需要再次回表，因为sort_buffer中存放的只有部分字段内容。
+
+
+### mysql innodb缓存池LRU算法原理
+
+mysql为了提高查询的效率将每次查询的数据
+
+### mysql join 表优化原则
+
+mysql在进行join的时候会采用Nested Loop Join算法，一般会有Index Nested-Loop Join（NLJ）、Block Nested-Loop Join（BNL），一般来说NLJ算法性能是比较好的，因为连接条件能使用上索被驱动表扫描的行数较少，尽量少使用BNL，容易造成被驱动表全表扫描的情况，join的时候尽量选择小表作为驱动表。
+
+选择驱动表的规则：
+```
+1. 指定了连接条件时，满足查询条件的记录行数最少的表为驱动表；
+2. 未指定连接条件时，行数最少的为驱动表；
+3. straight_join，左边的表为驱动表；
+4. INNER JOIN、LEFT JOIN、RIGHT JOIN中，MySQL优化器自动选择最小表作为驱动表。
+```
+
+
+
 
 
