@@ -200,8 +200,8 @@ java并发包下的List只有一个CopyOnWriteArrayList，所以一般的情况�
 ## java并发包下的Set有用哪些？具体实现原理了解吗？
 
 java并发包下的Set我了解到的有CopyOnWriteArraySet、ConcurrentSkipListSet。  
- CopyOnWriteArraySet底层包装的是CopyOnWriteArrayList，它是基于CopyOnWriteArraySet实现的，没有做什么额外的逻辑。  
- ConcurrentSkipListSet底层包装的是ConcurrentSkipListMap，ConcurrentSkipListMap底层则是基于跳表实现的。
+CopyOnWriteArraySet底层包装的是CopyOnWriteArrayList，它是基于CopyOnWriteArraySet实现的，没有做什么额外的逻辑。  
+ConcurrentSkipListSet底层包装的是ConcurrentSkipListMap，ConcurrentSkipListMap底层则是基于跳表实现的。
 
 ## AQS了解吗，具体什么原理，java并发下都有哪些工具使用了AQS？
 
