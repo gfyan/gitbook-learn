@@ -17,6 +17,7 @@
   * [MongoDB数据库](database/mongodb-shu-ju-ku.md)
   * [mysql数据库](database/mysql-shu-ju-ku.md)
 * [项目实战部分](project/README.md)
+  * [缓存相关问题](project/huan-cun-xiang-guan-wen-ti.md)
   * [项目技术方案](project/xiang-mu-ji-shu-fang-an.md)
   * [项目综合问题](project/xiang-mu-zong-he-wen-ti.md)
   * [面试相关](project/mian-shi-xiang-guan.md)
