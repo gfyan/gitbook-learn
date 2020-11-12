@@ -10,6 +10,7 @@
 * [网络部分](internet_basic/README.md)
   * [计算机网络](internet_basic/ji-suan-ji-wang-luo.md)
 * [中间件部分](middleware/README.md)
+  * [中间件综合笔记](middleware/zhong-jian-jian-zong-he-bi-ji.md)
   * [Netty部分](middleware/netty-bu-fen.md)
   * [redis部分](middleware/redis.md)
   * [rocketMQ部分](middleware/rocketmq-bu-fen.md)
