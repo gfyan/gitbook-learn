@@ -205,3 +205,50 @@ ConcurrentSkipListSet底层包装的是ConcurrentSkipListMap，ConcurrentSkipLis
 
 ## AQS了解吗，具体什么原理，java并发下都有哪些工具使用了AQS？
 
+java.util.concurrent.locks.AbstractQueuedSynchronizer 抽象类，简称 AQS ，是一个用于构建锁和同步容器的同步器。事实上concurrent 包内许多类都是基于 AQS 构建。例如 ReentrantLock，Semaphore，CountDownLatch，ReentrantReadWriteLock，等。AQS 解决了在实现同步容器时设计的大量细节问题。
+
+AQS使用了一个FIFO（先进先出）表示排队队列以及和一个volatile的state变量来实现并发相关的各种场景，队列中存的是线程节点，每个节点都维护了一个等待状态waitStatus。
+
+
+### Java线程池创建有哪几种方式？
+
+1. 采用Executors静态方法创建线程池。
+
+**newFixedThreadPool(int nThreads)创建一个固定长度线程池，等待队列无限大**
+**newCachedThreadPool(int nThreads)创建一个动态线程池，最大线程数无限大，核心线程为0，等待队列为SynchronousQueue**
+**newScheduledThreadPool(int nThreads)创建一个固定长度线程池，且可以以延迟或定时方式来执行**
+
+2. 直接new ThreadPoolExecutor创建一个线程池。
+
+> 核心参数 corePoolSize（核心线程数）、maxnumPoolSize（最大线程数）、keepAliveTime（当线程数大于corePoolSize的空闲线程最大存活时间）、uni（时间单位）、workQueue（等待队列）、threadFactory（创建线程工厂）。
+
+**有哪些拒绝策略**
+
+1.AbortPolicy，直接抛出异常。<br>
+2.CallerRunsPolicy，直接调用run方法执行。<br>
+3.DiscardPolicy，抛弃任务。<br>
+4.DiscardOldestPolicy，抛弃最老的任务。<br>
+
+### 线程池关闭的几种方式？
+
+1. shutdown（）方法，不会立即终止线程，但是会拒绝接受新的任务，等待缓存任务队列都执行完毕后才终止。
+1. shutdownNow（）方法，立即终止线程，并尝试打断正在执行的任务，并且清空任务缓存队列，返回尚未执行的任务。
+
+> 一般结合两个方法使用，可以先调用showdown方法，然后再调用awaitTermination等待线程终止，等待时间可以设置为60s，60s之后如果还没有终止则调用shutdownNow（）方法。
+
+### execute和submit方法的区别？
+
+execute提交的是实现Runnable的线程，且没有返回值，如果线程执行过程中有异常抛出则会直接抛出异常。<br>
+submit提交的线程可以实现Callable也可以实现Runnable，存在返回值，如果线程执行过程中有异常抛出不会抛出到业务层，需要手动
+
+### Fork/Join 框架是什么？
+
+Fork/Join 框架是一个实现了 ExecutorService接口的多线程处理器。它可以把一个大的任务划分为若干个小的任务并发执行，充分利用可用的资源，进而提高应用的执行效率。
+
+### 如何让一段程序并发的执行，并最终汇总结果？
+
+1. 使用CountDownLatch：每个线程执行完毕都执行countDown方法，汇总结果的线程进行await等待。
+2. 使用CyclicBarrier：让每个线程执行完毕后都执行await方法，并编写barrierCommand线程执行逻辑进行汇总。
+3. 使用fork/join：
+
+

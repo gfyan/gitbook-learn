@@ -56,7 +56,7 @@ Web层包括WebSocket（Spring4.0版本添加的支持，在一个Web应用中�
 
 ### 什么是Spring IOC 容器？
 
-控制反转即IOC (Inversion of Control)，它把传统上由程序代码直接操控的对象的调用权交给容器，通过容器来实现对象组件的装配和管理。所谓的“控制反转”概念就是对组件对象控制权的转移，从程序代码本身转移到了外部容器。Spring IOC负责创建对象、管理对象，通过DI装配对象、配置对象，并且管理对象的声明周期。
+控制反转即IOC (Inversion of Control)，它把传统上由程序代码直接操控的对象的调用权交给容器，通过容器来实现对象组件的装配和管理。所谓的“控制反转”概念就是对组件对象控制权的转移，从程序代码本身转移到了外部容器。Spring IOC负责创建对象、管理对象，通过DI装配对象、配置对象，并且管理对象的生命周期。
 
 ### 什么是依赖注入（DI）？
 
@@ -103,6 +103,13 @@ BeanFactory：是Spring里面最底层的接口，包含了各种Bean的定义�
 
 ### 什么是Spring beans？
 Spring beans 是那些形成Spring应用的主干的java对象。它们被Spring IOC容器初始化，装配，和管理。这些beans通过容器中配置的元数据创建。比如以XML文件中的形式定义，注解Bean定义的Java POJO。
+
+### Spring Bean生命周期？
+1. 首先会经过BeanFactory创建bean，对bean进行实例化，这个时候bean还是原始状态。
+2. 设置对象属性（依赖注入）。
+3. 对Bean进行初始化。
+4. 销毁。
+
 
 ### Spring支持的几种bean的作用域
 

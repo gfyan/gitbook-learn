@@ -14,5 +14,8 @@ Spring Boot是建立在Spring之上的，而Spring Foramwork又包含Spring IOC�
 
 ## Spring Boot是怎么实现自动装配starter组件的。
 
-Spring Boot实现自动装配的核心原理在于
+Spring Boot实现自动装配通过@EnableAutoConfiguration注解开启自动配置，加载Spring.factories中注册的各种AutoConfiguration类，当某个AutoConfiguration类满足其@Conditional指定的生成条件时就会自动实例化该bean，并注入到Bean容器中，从而达到自动装配各个组件。
+
+
+
 
