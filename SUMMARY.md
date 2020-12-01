@@ -14,6 +14,8 @@
   * [Netty部分](middleware/netty-bu-fen.md)
   * [redis部分](middleware/redis.md)
   * [rocketMQ部分](middleware/rocketmq-bu-fen.md)
+  * [kafka部分](middleware/kafka-bu-fen.md)
+  * [RabbitMQ部分](middleware/rabbitmq-bu-fen.md)
 * [数据库部分](database/README.md)
   * [MongoDB数据库](database/mongodb-shu-ju-ku.md)
   * [mysql数据库](database/mysql-shu-ju-ku.md)
