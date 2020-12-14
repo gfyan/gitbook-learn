@@ -30,3 +30,14 @@
 4. MyCAT （分库分表查询）
 5. Seata（分布式事务框架）
 6. Canal（基于binlog的数据同步中间件）
+
+
+### 消息中间件的区别？
+
+**RocketMQ VS Kafka**
+
+**RocketMQ VS RabbitMQ**
+
+
+
+

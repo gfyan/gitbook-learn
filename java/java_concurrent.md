@@ -251,4 +251,9 @@ Fork/Join 框架是一个实现了 ExecutorService接口的多线程处理器。
 2. 使用CyclicBarrier：让每个线程执行完毕后都执行await方法，并编写barrierCommand线程执行逻辑进行汇总。
 3. 使用fork/join：
 
+### Java并发队列都有哪些，具体原理是什么？
+
+**1. ConcurrentLinkedQueue**
+
+ConcurrentLinkedQueue是一个线程安全非阻塞队列，其底层采用单向链表实现，入队与出队操作使用CAS来实现线程安全。
 
