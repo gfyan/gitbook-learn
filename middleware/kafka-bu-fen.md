@@ -115,49 +115,49 @@ Consumer端有一个参数connect.max.idle.ms（最大空闲时间默认为9分�
 
 #### Kafka Consumer 重要的参数
 
-**bootstrap.servers：集群地址，一般设置三个，不需要设置全部的集群地址**
+**bootstrap.servers：**集群地址，一般设置三个，不需要设置全部的集群地址
 
-**group.id：消费组id**
+**group.id：**消费组id
 
-**fetch.min.bytes：消费者每次poll消息最小值，默认为1b，如果想要提高吞吐量则调大这个值，但是有一定的延迟性**
+**fetch.min.bytes：**消费者每次poll消息最小值，默认为1b，如果想要提高吞吐量则调大这个值，但是有一定的延迟性
 
-**fetch.max.bytes：消费者每次poll消息最大值，默认为50M**
+**fetch.max.bytes：**消费者每次poll消息最大值，默认为50M
 
-**fetch.max.wait.ms：与参数fetch.min.bytes对应，因为不能因为获取不到fetch.min.bytes值的大小而一直阻塞客户端，必须设定一个合理的等待值，如果对延迟敏感的消息，这个值可以设置的稍微小一些**
+**fetch.max.wait.ms：**与参数fetch.min.bytes对应，因为不能因为获取不到fetch.min.bytes值的大小而一直阻塞客户端，必须设定一个合理的等待值，如果对延迟敏感的消息，这个值可以设置的稍微小一些
 
-**max.partition.fetch.bytes：消费端每个分区返回消费端最大数据量，默认值为1M**
+**max.partition.fetch.bytes：**消费端每个分区返回消费端最大数据量，默认值为1M
 
-**max.poll.records：消费端每次poll消息条数最大值，默认为500，一般不要设置特别大，因为如果下次消费还未消费完的话可能会导致消费端重平衡，导致消费阻塞**
+**max.poll.records：**消费端每次poll消息条数最大值，默认为500，一般不要设置特别大，因为如果下次消费还未消费完的话可能会导致消费端重平衡，导致消费阻塞
 
-**max.poll.interval.ms：这个表示两次调用poll方法的最大时间间隔，默认为5分钟，如果超过5分钟Kafka的协调者则会认为这个消费者挂掉，会进行提出组处理**
+**max.poll.interval.ms：**这个表示两次调用poll方法的最大时间间隔，默认为5分钟，如果超过5分钟Kafka的协调者则会认为这个消费者挂掉，会进行提出组处理
 
-**connections.max.idle.ms：这个参数指定客户端每个连接最大空闲时间，默认为9分钟，超过这个时间客户端就会关闭这个连接**
+**connections.max.idle.ms：**这个参数指定客户端每个连接最大空闲时间，默认为9分钟，超过这个时间客户端就会关闭这个连接
 
-**exclude.internal.topics：这个参数一般不用动，表示是否支持消费端用subscribe（Pattern）来订阅内部主题，默认值为true表示消费端只能通过subscribe（Collection）来订阅内部主题，设置为false则没有这个限制。PS：内部主题为__consumer_offsets位移主题、__transaction_state事务主题**
+**exclude.internal.topics：**这个参数一般不用动，表示是否支持消费端用subscribe（Pattern）来订阅内部主题，默认值为true表示消费端只能通过subscribe（Collection）来订阅内部主题，设置为false则没有这个限制。
 
-**receive.buffer.bytes：这个参数用来设置Socket接受消息缓冲区的大小，默认值为64KB**
+**receive.buffer.bytes：**这个参数用来设置Socket接受消息缓冲区的大小，默认值为64KB
 
-**send.buffer.bytes：这个参数用来设置Socket发送消息缓冲区的大小，默认值为128KB**
+**send.buffer.bytes：**这个参数用来设置Socket发送消息缓冲区的大小，默认值为128KB
 
 #### Consumer位移提交
 
 Kafka早期位移提交设计是放在Zookeeper中的，但是Zookeeper设计理念是基于CP的，所以不太适合高并发的写，而且放在Zookeeper中也有局限性，必须依赖Zookeeper，后面Kafka位移提交是采用了内部主题，Kafka有一个内部主题__consumer_offsets来储存位移，默认有50个分区，每个分区有三个副本。
 
-**Kafka Consumer每次启动的时候，如果内部主题还未创建，则会默认创建__consumer_offsets分区数为50个**
+**1.Kafka Consumer每次启动的时候，如果内部主题还未创建，则会默认创建__consumer_offsets分区数为50个**
 
-**Kafka Consumer每条消息都对应一个offset值，位移提交就是将消费的位移值写入到内部主题中**
+**2.Kafka Consumer每条消息都对应一个offset值，位移提交就是将消费的位移值写入到内部主题中**
 
-**Kafka有一个清除策略，会定期去清除位移主题中已经过期的消息来防止位移主题无限膨胀**
+**3.Kafka有一个清除策略，会定期去清除位移主题中已经过期的消息来防止位移主题无限膨胀**
 
-**Kafka位移提交分为手动提交和自动提交，自动提交比较省事但是容易丢消息，手动提交编码复杂一点但是数据安全**
+**4.Kafka位移提交分为手动提交和自动提交，自动提交比较省事但是容易丢消息，手动提交编码复杂一点但是数据安全**
 
 #### Consumer重平衡
 
 触发重平衡三个点：
 
-**1.消费组内成员变动**</br>
-**2.订阅主题数量发生变化，这个主要是针对那些通过subscribe（Pattern）来订阅主题的消费组**</br>
-**3.订阅主题分区数发生改变**</br>
+**1.消费组内成员变动**<br>
+**2.订阅主题数量发生变化，这个主要是针对那些通过subscribe（Pattern）来订阅主题的消费组**<br>
+**3.订阅主题分区数发生改变**<br>
 
 这里我们只针对第一个点进行讨论，第二个和第三个属于无法避免的，消费端尽量明确消费Topic，尽量少写正则来订阅主题数，然后尽量减少分区数的改动。
 
