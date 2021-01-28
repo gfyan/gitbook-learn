@@ -236,10 +236,66 @@ AQS使用了一个FIFO（先进先出）表示排队队列以及和一个volatil
 
 > 一般结合两个方法使用，可以先调用showdown方法，然后再调用awaitTermination等待线程终止，等待时间可以设置为60s，60s之后如果还没有终止则调用shutdownNow（）方法。
 
+### 线程池的运行原理
+
+线程池的运行原理主要可以分为以下几个方面来叙说：
+
+**1. 线程池的运行状态**
+
+线程池的运行状态是通过一个ctl字段变量来实现的，线程池有RUNNING（运行中）、SHUTDOWN（关闭）、STOP（关闭）、TERMINATED（终止）几个状态。
+
+ctl字段是一个原子类AtomicInteger，其中高3位为线程池状态位，低29位为线程池中工作线程数量。
+```
+volatile int runState;
+static final int RUNNING    = 0;
+static final int SHUTDOWN   = 1;
+static final int STOP       = 2;
+static final int TERMINATED = 3;
+```
+
+**2. 任务如何执行**
+
+线程池提交任务有两种方式，一种是submit、一种是execute，execute没有返回值，且只能提交Runnable的任务，任务执行过程中如果有异常直接抛出。submit有返回值，并且可以提交Runnable、Callback两种任务，任务执行过程中有异常不会抛出，获取任务执行结果的时候会抛出。
+
+**3. 线程池的线程初始化**
+
+默认情况下，创建线程池之后，线程池中是没有线程的，需要提交任务之后才会创建线程。但是线程池提供了两个方法，一个可以初始化所有的核心线程，一个是初始化一个核心线程。
+
+**4. 任务排队队列以及排队策略**
+
+在前面我们多次提到了任务缓存队列，即workQueue，它用来存放等待执行的任务。
+
+workQueue的类型为BlockingQueue<Runnable>，通常可以取下面三种类型：
+
+1）ArrayBlockingQueue：基于数组的先进先出队列，此队列创建时必须指定大小；
+
+2）LinkedBlockingQueue：基于链表的先进先出队列，如果创建时没有指定此队列大小，则默认为Integer.MAX_VALUE；
+
+3）synchronousQueue：这个队列比较特殊，它不会保存提交的任务，而是将直接新建一个线程来执行新来的任务。
+
+
+**5. 任务拒绝策略**
+
+hreadPoolExecutor.AbortPolicy：丢弃任务并抛出RejectedExecutionException异常。
+
+ThreadPoolExecutor.DiscardPolicy：也是丢弃任务，但是不抛出异常。
+
+ThreadPoolExecutor.DiscardOldestPolicy：丢弃队列最前面的任务，然后重新尝试执行任务（重复此过程）
+
+ThreadPoolExecutor.CallerRunsPolicy：由调用线程处理该任务
+
+**6. 线程池的关闭**
+
+**7. 线程池容量动态调整**
+
+ThreadPoolExecutor提供了动态调整线程池容量大小的方法：setCorePoolSize(设置核心池线程数)和setMaximumPoolSize(设置最大线程数)。
+
+当上述参数从小变大时，ThreadPoolExecutor进行线程赋值，还可能立即创建新的线程来执行任务。
+
 ### execute和submit方法的区别？
 
 execute提交的是实现Runnable的线程，且没有返回值，如果线程执行过程中有异常抛出则会直接抛出异常。<br>
-submit提交的线程可以实现Callable也可以实现Runnable，存在返回值，如果线程执行过程中有异常抛出不会抛出到业务层，需要手动
+submit提交的线程可以实现Callable也可以实现Runnable，存在返回值，如果线程执行过程中有异常抛出不会抛出到业务层，手动获取线程执行结果的时候会将异常抛出。
 
 ### Fork/Join 框架是什么？
 
